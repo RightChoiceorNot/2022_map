@@ -257,10 +257,6 @@ body{font-family:'Microsoft JhengHei','微軟正黑體',sans-serif;
     </div>
     <div class="stats-body" id="stats-d1-body"></div>
   </div>
-  <div id="note-d1" class="note-box">
-    游標滑過鄉鎮查看詳細資訊<br>
-    淡灰色：直轄市區（官派）或 2022 年未辦鄉鎮市長選舉
-  </div>
 
   <!-- V1 -->
   <div id="map-v1" class="map-layer hidden"></div>
@@ -672,7 +668,7 @@ function switchTab(tab){
   if(!isMobile)hideTT();
   closeMobileInfo();
   const isD1=(tab==='d1');
-  ['map','county-bar','county-select-wrap','legend','stats','note'].forEach(k=>{
+  ['map','county-bar','county-select-wrap','legend','stats'].forEach(k=>{
     document.getElementById(`${k}-d1`)?.classList.toggle('hidden',!isD1);
     document.getElementById(`${k}-v1`)?.classList.toggle('hidden',isD1);
   });
