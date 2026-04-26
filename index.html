@@ -11,7 +11,7 @@
 body{font-family:'Microsoft JhengHei','微軟正黑體',sans-serif;
      background:#1a1a2e;color:#333;overflow:hidden;}
 
-/* ── Loading 畫面 ── */
+/* ── Loading ── */
 #loading{
   position:fixed;inset:0;z-index:99999;
   background:rgba(22,33,62,0.96);
@@ -61,7 +61,7 @@ body{font-family:'Microsoft JhengHei','微軟正黑體',sans-serif;
   padding:7px 12px;border-radius:10px;
   box-shadow:0 3px 12px rgba(0,0,0,0.3);
 }
-/* 桌機鄉鎮按鈕列（僅 V1，top 由 JS 動態設定）*/
+/* 桌機鄉鎮按鈕列（top 由 JS 動態設定）*/
 .town-bar{
   position:absolute;left:50%;transform:translateX(-50%);
   z-index:900;display:flex;flex-wrap:wrap;gap:4px;
@@ -119,15 +119,6 @@ body{font-family:'Microsoft JhengHei','微軟正黑體',sans-serif;
 .stat-row{display:flex;align-items:center;margin-bottom:4px;}
 .stat-dot{width:11px;height:11px;border-radius:2px;margin-right:7px;
   flex-shrink:0;border:1px solid rgba(0,0,0,0.15);}
-
-/* 備註 */
-.note-box{
-  position:absolute;bottom:12px;right:12px;z-index:900;
-  background:rgba(255,255,255,0.90);border-radius:7px;
-  padding:7px 11px;font-size:11px;color:#666;
-  box-shadow:0 2px 8px rgba(0,0,0,0.12);
-  border:1px solid #ddd;max-width:265px;line-height:1.65;
-}
 
 /* 桌機 Tooltip */
 #tooltip{
@@ -196,7 +187,6 @@ body{font-family:'Microsoft JhengHei','微軟正黑體',sans-serif;
     left:12px !important;right:12px !important;
     bottom:8px !important;top:auto !important;
   }
-  .note-box{display:none !important;}
   #tooltip{display:none !important;}
   #mobile-info{display:none;}
   .leaflet-control-zoom{display:none !important;}
@@ -205,7 +195,6 @@ body{font-family:'Microsoft JhengHei','微軟正黑體',sans-serif;
 </head>
 <body>
 
-<!-- Loading 畫面 -->
 <div id="loading">
   <div class="spinner"></div>
   <p>地圖資料載入中，請稍候...</p>
@@ -238,14 +227,20 @@ body{font-family:'Microsoft JhengHei','微軟正黑體',sans-serif;
 </div>
 <div id="map-container">
 
-  <!-- D1 -->
+  <!-- D1 鄉鎮市長 -->
   <div id="map-d1" class="map-layer"></div>
   <div id="county-bar-d1" class="county-bar"></div>
+  <div id="town-bar-d1" class="town-bar hidden"></div>
   <div id="county-select-wrap-d1" class="county-select-wrap">
     <div class="select-row">
       <label>縣市：</label>
       <select id="county-select-d1" class="county-select"
-              onchange="selectD1County(this.value)"></select>
+              onchange="onD1CountyChange(this.value)"></select>
+    </div>
+    <div class="select-row" id="town-select-row-d1" style="display:none;">
+      <label>鄉鎮：</label>
+      <select id="town-select-d1" class="county-select"
+              onchange="selectD1Town(this.value)"></select>
     </div>
   </div>
   <div id="legend-d1" class="legend-box">
@@ -258,7 +253,7 @@ body{font-family:'Microsoft JhengHei','微軟正黑體',sans-serif;
     <div class="stats-body" id="stats-d1-body"></div>
   </div>
 
-  <!-- V1 -->
+  <!-- V1 村里長 -->
   <div id="map-v1" class="map-layer hidden"></div>
   <div id="county-bar-v1" class="county-bar hidden"></div>
   <div id="town-bar-v1" class="town-bar hidden"></div>
@@ -283,7 +278,7 @@ body{font-family:'Microsoft JhengHei','微軟正黑體',sans-serif;
     </div>
     <div class="stats-body" id="stats-v1-body"></div>
   </div>
-  <div id="note-v1" class="note-box hidden">
+  <div id="note-v1" class="note-box hidden" style="bottom:12px;right:12px;">
     游標滑過各里查看當選人與黨籍<br>
     灰色里（共 21 里）：2022 年選舉後新設或 Shapefile 缺漏
   </div>
@@ -293,26 +288,17 @@ body{font-family:'Microsoft JhengHei','微軟正黑體',sans-serif;
 const isMobile = window.innerWidth <= 768 ||
   /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
 
-// ── 地圖初始化（底圖先跑，不等資料）──────────────────────
 const TILE='https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png';
 const TOPT={attribution:'© OpenStreetMap © CartoDB',subdomains:'abcd',maxZoom:19};
 function createMap(id){
-  const m=L.map(id,{
-    center:[23.6,120.9],zoom:8,
-    preferCanvas:true,          // Canvas 渲染，大幅提升效能
-    zoomControl:!isMobile
-  });
+  const m=L.map(id,{center:[23.6,120.9],zoom:8,preferCanvas:true,zoomControl:!isMobile});
   L.tileLayer(TILE,TOPT).addTo(m);
   return m;
 }
 const mapD1=createMap('map-d1');
 const mapV1=createMap('map-v1');
-if(!isMobile){
-  mapD1.on('movestart',hideTT);
-  mapV1.on('movestart',hideTT);
-}
+if(!isMobile){mapD1.on('movestart',hideTT);mapV1.on('movestart',hideTT);}
 
-// ── 共用工具函式 ──────────────────────────────────────────
 let PARTY_COLORS={};
 function getColor(p){return PARTY_COLORS[p]||'#BBBBBB';}
 
@@ -371,8 +357,6 @@ function buildD1Content(p){
 }
 function buildV1Content(p){
   const party=p['政黨名稱']||'—',color=getColor(party);
-  const votes=p['得票數']!=null?String(p['得票數']):'—';
-  const rate=p['得票率']!=null?p['得票率']+'%':'—';
   return `
     <div class="tt-title mi-title">
       ${p.COUNTYNAME} ${p['鄉鎮名稱']||p.TOWNNAME} ${p['里名']||p.VILLNAME}
@@ -380,15 +364,17 @@ function buildV1Content(p){
     <div><span class="tt-lb mi-lb">當選黨籍：</span>
       <span class="tt-party mi-party" style="color:${color}">${party}</span></div>
     <div><span class="tt-lb mi-lb">當選人：</span><b>${p['當選人']||'—'}</b></div>
-    <div><span class="tt-lb mi-lb">得票數：</span>${votes}</div>
-    <div><span class="tt-lb mi-lb">得票率：</span>${rate}</div>`;
+    <div><span class="tt-lb mi-lb">得票數：</span>${p['得票數']!=null?String(p['得票數']):'—'}</div>
+    <div><span class="tt-lb mi-lb">得票率：</span>${p['得票率']!=null?p['得票率']+'%':'—'}</div>`;
 }
 
-// ── 狀態變數（資料載入後初始化）─────────────────────────
+// ── 狀態 ──────────────────────────────────────────────────
 const d1Bounds={};
+const d1TownLayerBounds={};  // county__town -> bounds
 const v1Bounds={};
-const v1TownBounds={};  // key = county__town
+const v1TownBounds={};
 let currentD1County='全台';
+let currentD1Town='全部鄉鎮';
 let currentV1County='全台';
 let currentV1Town='全部鄉鎮';
 let selectedD1Layer=null;
@@ -396,19 +382,15 @@ let selectedV1Layer=null;
 let d1Layer=null;
 let v1Layer=null;
 
-// ── fetch 非同步載入資料 ──────────────────────────────────
+// ── fetch ─────────────────────────────────────────────────
 fetch('map_data.json')
-  .then(r=>{
-    if(!r.ok) throw new Error('map_data.json 載入失敗');
-    return r.json();
-  })
+  .then(r=>{if(!r.ok)throw new Error('map_data.json 載入失敗');return r.json();})
   .then(data=>{
-    PARTY_COLORS = data.partyColors;
+    PARTY_COLORS=data.partyColors;
     initD1(data);
     initV1(data);
     selectD1County('全台');
     selectV1County('全台');
-    // 隱藏 Loading
     const loading=document.getElementById('loading');
     loading.style.transition='opacity 0.5s';
     loading.style.opacity='0';
@@ -422,17 +404,26 @@ fetch('map_data.json')
       且透過 HTTP 伺服器開啟（不可直接雙擊 HTML）</p>`;
   });
 
-// ── D1 初始化 ─────────────────────────────────────────────
+// ══ D1 初始化 ═════════════════════════════════════════════
 function initD1(data){
-  const D1_COUNTY_STATS=data.d1CountyStats;
-  const D1_COUNTY_LIST=data.d1CountyList;
+  window._d1CountyStats = data.d1CountyStats;
+  window._d1TownData    = data.d1TownData;
+  window._d1TownList    = data.d1TownList;
 
   d1Layer=L.geoJSON(data.geojsonD1,{
     style:f=>({fillColor:getColor(f.properties['政黨名稱']),color:'white',weight:0.5,fillOpacity:0.85}),
     onEachFeature:(f,layer)=>{
       const p=f.properties,party=p['政黨名稱']||'—';
-      const county=p.COUNTYNAME;
-      if(county){if(!d1Bounds[county])d1Bounds[county]=[];try{d1Bounds[county].push(layer.getBounds());}catch(e){}}
+      const county=p.COUNTYNAME,town=p.TOWNNAME;
+      if(county){
+        if(!d1Bounds[county])d1Bounds[county]=[];
+        try{d1Bounds[county].push(layer.getBounds());}catch(e){}
+      }
+      if(county&&town){
+        const tk=county+'__'+town;
+        if(!d1TownLayerBounds[tk])d1TownLayerBounds[tk]=[];
+        try{d1TownLayerBounds[tk].push(layer.getBounds());}catch(e){}
+      }
       if(!isMobile){
         layer.on('mouseover',e=>{layer.setStyle({color:'#333',weight:2,fillOpacity:0.95});showTT(e,buildD1Content(p));});
         layer.on('mousemove',e=>moveTT(e));
@@ -449,48 +440,89 @@ function initD1(data){
     }
   }).addTo(mapD1);
 
-  // 桌機按鈕
+  // 桌機縣市按鈕
   const d1Bar=document.getElementById('county-bar-d1');
-  D1_COUNTY_LIST.forEach(county=>{
+  data.d1CountyList.forEach(county=>{
     const btn=document.createElement('button');
     btn.className='county-btn'+(county==='全台'?' active':'');
     btn.textContent=county;btn.onclick=()=>selectD1County(county);d1Bar.appendChild(btn);
   });
-  // 手機下拉
+  // 手機縣市下拉
   const d1Sel=document.getElementById('county-select-d1');
-  D1_COUNTY_LIST.forEach(county=>{
+  data.d1CountyList.forEach(county=>{
     const opt=document.createElement('option');opt.value=county;opt.textContent=county;d1Sel.appendChild(opt);
   });
-
-  window._d1CountyStats=D1_COUNTY_STATS;
-  window._d1CountyList=D1_COUNTY_LIST;
 }
 
 function resetD1Style(layer,party){
   const fc=layer.feature.properties.COUNTYNAME;
-  if(currentD1County==='全台'||fc===currentD1County){
-    layer.setStyle({fillColor:getColor(party),color:'white',weight:0.5,fillOpacity:0.85});
-  } else {
-    layer.setStyle({fillColor:'#D8D8D8',color:'white',weight:0.1,fillOpacity:0.25});
+  const ft=layer.feature.properties.TOWNNAME;
+  const inScope=currentD1County==='全台'||
+    (fc===currentD1County&&(currentD1Town==='全部鄉鎮'||ft===currentD1Town));
+  if(inScope){layer.setStyle({fillColor:getColor(party),color:'white',weight:0.5,fillOpacity:0.85});}
+  else{layer.setStyle({fillColor:'#D8D8D8',color:'white',weight:0.1,fillOpacity:0.25});}
+}
+
+// 桌機鄉鎮按鈕列
+const d1TownBar=document.getElementById('town-bar-d1');
+function rebuildD1TownBar(county){
+  d1TownBar.innerHTML='';
+  if(county==='全台'){d1TownBar.classList.add('hidden');return;}
+  d1TownBar.classList.remove('hidden');
+  const countyBarEl=document.getElementById('county-bar-d1');
+  if(countyBarEl){
+    const rect=countyBarEl.getBoundingClientRect();
+    const mapRect=document.getElementById('map-container').getBoundingClientRect();
+    d1TownBar.style.top=(rect.bottom-mapRect.top+6)+'px';
   }
+  const towns=window._d1TownList||{};
+  ['全部鄉鎮',...(towns[county]||[])].forEach(town=>{
+    const btn=document.createElement('button');
+    btn.className='town-btn'+(town==='全部鄉鎮'?' active':'');
+    btn.textContent=town;btn.onclick=()=>selectD1Town(town);d1TownBar.appendChild(btn);
+  });
+}
+
+// 手機鄉鎮下拉
+const d1TownSelRow=document.getElementById('town-select-row-d1');
+function rebuildD1TownSel(county){
+  const sel=document.getElementById('town-select-d1');
+  sel.innerHTML='';
+  if(county==='全台'){d1TownSelRow.style.display='none';return;}
+  d1TownSelRow.style.display='flex';
+  const towns=window._d1TownList||{};
+  ['全部鄉鎮',...(towns[county]||[])].forEach(town=>{
+    const opt=document.createElement('option');opt.value=town;opt.textContent=town;sel.appendChild(opt);
+  });
+  sel.value='全部鄉鎮';
+}
+
+function onD1CountyChange(county){
+  rebuildD1TownSel(county);
+  selectD1County(county);
 }
 
 function selectD1County(county){
   closeMobileInfo();
   if(selectedD1Layer){resetD1Style(selectedD1Layer,selectedD1Layer.feature.properties['政黨名稱']||'—');selectedD1Layer=null;}
   currentD1County=county;
+  currentD1Town='全部鄉鎮';
   document.querySelectorAll('#county-bar-d1 .county-btn').forEach(b=>b.classList.toggle('active',b.textContent===county));
   const d1Sel=document.getElementById('county-select-d1');
   if(d1Sel)d1Sel.value=county;
+  rebuildD1TownBar(county);
+  // 統計面板：恢復政黨席次
   const stats=window._d1CountyStats||{};
   const data=stats[county]||{counts:{},total:0};
   document.getElementById('stats-d1-title').textContent=
     county==='全台'?`📊 全台 鄉鎮市長（共 ${data.total} 席）`:`📊 ${county} 鄉鎮市長（共 ${data.total} 席）`;
   renderStats('stats-d1-body',data.counts,data.total,'席');
+  // 地圖飛行
   if(county==='全台'){mapD1.setView([23.6,120.9],8);}
   else if(d1Bounds[county]?.length){
     let m=d1Bounds[county][0];d1Bounds[county].forEach(b=>{m=m.extend(b);});mapD1.fitBounds(m,{padding:[30,30]});
   }
+  // 圖層顏色
   if(d1Layer){
     d1Layer.eachLayer(layer=>{
       const fc=layer.feature.properties.COUNTYNAME,party=layer.feature.properties['政黨名稱'];
@@ -501,12 +533,85 @@ function selectD1County(county){
   if(!isMobile)hideTT();
 }
 
-// ── V1 初始化 ─────────────────────────────────────────────
+function selectD1Town(town){
+  closeMobileInfo();
+  if(selectedD1Layer){resetD1Style(selectedD1Layer,selectedD1Layer.feature.properties['政黨名稱']||'—');selectedD1Layer=null;}
+  currentD1Town=town;
+  document.querySelectorAll('#town-bar-d1 .town-btn').forEach(b=>b.classList.toggle('active',b.textContent===town));
+  const townSel=document.getElementById('town-select-d1');
+  if(townSel)townSel.value=town;
+
+  if(town==='全部鄉鎮'){
+    // 恢復政黨席次統計
+    const stats=window._d1CountyStats||{};
+    const data=stats[currentD1County]||{counts:{},total:0};
+    document.getElementById('stats-d1-title').textContent=
+      `📊 ${currentD1County} 鄉鎮市長（共 ${data.total} 席）`;
+    renderStats('stats-d1-body',data.counts,data.total,'席');
+    // 飛回縣市範圍
+    if(d1Bounds[currentD1County]?.length){
+      let m=d1Bounds[currentD1County][0];d1Bounds[currentD1County].forEach(b=>{m=m.extend(b);});
+      mapD1.fitBounds(m,{padding:[30,30]});
+    }
+    // 恢復全縣市顏色
+    if(d1Layer){
+      d1Layer.eachLayer(layer=>{
+        const fc=layer.feature.properties.COUNTYNAME,party=layer.feature.properties['政黨名稱'];
+        if(fc===currentD1County){layer.setStyle({fillColor:getColor(party),color:'white',weight:0.5,fillOpacity:0.85});}
+      });
+    }
+  } else {
+    // 顯示單一鄉鎮詳細資訊
+    const key=currentD1County+'__'+town;
+    const td=(window._d1TownData||{})[key];
+    if(td){
+      const color=PARTY_COLORS[td.party]||'#888';
+      document.getElementById('stats-d1-title').textContent=`📍 ${td.county} ${td.town}`;
+      document.getElementById('stats-d1-body').innerHTML=`
+        <div class="stat-row" style="margin-bottom:8px;">
+          <div class="stat-dot" style="background:${color}"></div>
+          <span style="font-weight:bold;color:${color}">${td.party}</span>
+        </div>
+        <div style="font-size:12px;line-height:2.1;">
+          <div><span style="color:#888">當選人：</span><b>${td.winner}</b></div>
+          <div><span style="color:#888">得票數：</span>${td.votes}</div>
+          <div><span style="color:#888">有效票：</span>${td.valid}</div>
+          <div><span style="color:#888">得票率：</span>${td.rate}</div>
+        </div>`;
+      // 自動展開統計面板
+      const box=document.getElementById('stats-d1');
+      if(box.classList.contains('collapsed')){
+        box.classList.remove('collapsed');
+        document.getElementById('toggle-d1').textContent='▲ 收合';
+      }
+    }
+    // 飛到該鄉鎮，暗化其他鄉鎮
+    const tk=currentD1County+'__'+town;
+    if(d1TownLayerBounds[tk]?.length){
+      let m=d1TownLayerBounds[tk][0];d1TownLayerBounds[tk].forEach(b=>{m=m.extend(b);});
+      mapD1.fitBounds(m,{padding:[40,40]});
+    }
+    if(d1Layer){
+      d1Layer.eachLayer(layer=>{
+        const fc=layer.feature.properties.COUNTYNAME;
+        const ft=layer.feature.properties.TOWNNAME;
+        const party=layer.feature.properties['政黨名稱'];
+        if(fc===currentD1County&&ft===town){
+          layer.setStyle({fillColor:getColor(party),color:'white',weight:0.5,fillOpacity:0.85});
+        } else {
+          layer.setStyle({fillColor:'#D8D8D8',color:'white',weight:0.1,fillOpacity:0.25});
+        }
+      });
+    }
+  }
+  if(!isMobile)hideTT();
+}
+
+// ══ V1 初始化 ═════════════════════════════════════════════
 function initV1(data){
-  const V1_COUNTY_STATS=data.v1CountyStats;
-  const V1_TOWN_STATS=data.v1TownStats;
-  const V1_TOWN_LIST=data.v1TownList;
-  const V1_COUNTY_LIST=data.v1CountyList;
+  window._v1CountyStats = data.v1CountyStats;
+  window._v1TownStats   = data.v1TownStats;
+  window._v1TownList    = data.v1TownList;
 
   v1Layer=L.geoJSON(data.geojsonV1,{
     style:f=>({fillColor:getColor(f.properties['政黨名稱']),color:'white',weight:0.2,fillOpacity:0.85}),
@@ -535,23 +640,16 @@ function initV1(data){
     }
   }).addTo(mapV1);
 
-  // 桌機縣市按鈕
   const v1Bar=document.getElementById('county-bar-v1');
-  V1_COUNTY_LIST.forEach(county=>{
+  data.v1CountyList.forEach(county=>{
     const btn=document.createElement('button');
     btn.className='county-btn'+(county==='全台'?' active':'');
     btn.textContent=county;btn.onclick=()=>selectV1County(county);v1Bar.appendChild(btn);
   });
-  // 手機縣市下拉
   const v1Sel=document.getElementById('county-select-v1');
-  V1_COUNTY_LIST.forEach(county=>{
+  data.v1CountyList.forEach(county=>{
     const opt=document.createElement('option');opt.value=county;opt.textContent=county;v1Sel.appendChild(opt);
   });
-
-  window._v1CountyStats=V1_COUNTY_STATS;
-  window._v1TownStats=V1_TOWN_STATS;
-  window._v1TownList=V1_TOWN_LIST;
-  window._v1CountyList=V1_COUNTY_LIST;
 }
 
 function resetV1Style(layer,party){
@@ -562,43 +660,39 @@ function resetV1Style(layer,party){
   else{layer.setStyle({fillColor:'#D8D8D8',color:'white',weight:0.1,fillOpacity:0.25});}
 }
 
-const townBar=document.getElementById('town-bar-v1');
-function rebuildTownBar(county){
-  townBar.innerHTML='';
-  if(county==='全台'){townBar.classList.add('hidden');return;}
-  townBar.classList.remove('hidden');
-  // 動態計算位置，避免與縣市列重疊
+const v1TownBar=document.getElementById('town-bar-v1');
+function rebuildV1TownBar(county){
+  v1TownBar.innerHTML='';
+  if(county==='全台'){v1TownBar.classList.add('hidden');return;}
+  v1TownBar.classList.remove('hidden');
   const countyBarEl=document.getElementById('county-bar-v1');
   if(countyBarEl){
     const rect=countyBarEl.getBoundingClientRect();
     const mapRect=document.getElementById('map-container').getBoundingClientRect();
-    townBar.style.top=(rect.bottom-mapRect.top+6)+'px';
+    v1TownBar.style.top=(rect.bottom-mapRect.top+6)+'px';
   }
   const towns=window._v1TownList||{};
   ['全部鄉鎮',...(towns[county]||[])].forEach(town=>{
     const btn=document.createElement('button');
     btn.className='town-btn'+(town==='全部鄉鎮'?' active':'');
-    btn.textContent=town;btn.onclick=()=>selectV1Town(town);townBar.appendChild(btn);
+    btn.textContent=town;btn.onclick=()=>selectV1Town(town);v1TownBar.appendChild(btn);
   });
 }
 
-const townSelRow=document.getElementById('town-select-row-v1');
-function rebuildTownSel(county){
-  const townSel=document.getElementById('town-select-v1');
-  townSel.innerHTML='';
-  if(county==='全台'){townSelRow.style.display='none';return;}
-  townSelRow.style.display='flex';
+const v1TownSelRow=document.getElementById('town-select-row-v1');
+function rebuildV1TownSel(county){
+  const sel=document.getElementById('town-select-v1');
+  sel.innerHTML='';
+  if(county==='全台'){v1TownSelRow.style.display='none';return;}
+  v1TownSelRow.style.display='flex';
   const towns=window._v1TownList||{};
   ['全部鄉鎮',...(towns[county]||[])].forEach(town=>{
-    const opt=document.createElement('option');opt.value=town;opt.textContent=town;townSel.appendChild(opt);
+    const opt=document.createElement('option');opt.value=town;opt.textContent=town;sel.appendChild(opt);
   });
-  townSel.value='全部鄉鎮';
+  sel.value='全部鄉鎮';
 }
 
-function onV1CountyChange(county){
-  rebuildTownSel(county);
-  selectV1County(county);
-}
+function onV1CountyChange(county){rebuildV1TownSel(county);selectV1County(county);}
 
 function selectV1County(county){
   closeMobileInfo();
@@ -607,7 +701,7 @@ function selectV1County(county){
   document.querySelectorAll('#county-bar-v1 .county-btn').forEach(b=>b.classList.toggle('active',b.textContent===county));
   const v1Sel=document.getElementById('county-select-v1');
   if(v1Sel)v1Sel.value=county;
-  rebuildTownBar(county);
+  rebuildV1TownBar(county);
   const stats=window._v1CountyStats||{};
   const data=stats[county]||stats['全台']||{counts:{},total:0};
   document.getElementById('stats-v1-title').textContent=
@@ -672,10 +766,19 @@ function switchTab(tab){
     document.getElementById(`${k}-d1`)?.classList.toggle('hidden',!isD1);
     document.getElementById(`${k}-v1`)?.classList.toggle('hidden',isD1);
   });
-  document.getElementById('town-bar-v1')?.classList.toggle('hidden',isD1);
+  document.getElementById('note-v1')?.classList.toggle('hidden',isD1);
+  // town-bar 各自獨立控制
   if(isD1){
-    const tr=document.getElementById('town-select-row-v1');
-    if(tr)tr.style.display='none';
+    document.getElementById('town-bar-v1')?.classList.add('hidden');
+    if(currentD1County!=='全台') rebuildD1TownBar(currentD1County);
+    else d1TownBar.classList.add('hidden');
+    // 清除 V1 手機鄉鎮下拉的 inline style
+    v1TownSelRow.style.display='none';
+  } else {
+    document.getElementById('town-bar-d1')?.classList.add('hidden');
+    if(currentV1County!=='全台') rebuildV1TownBar(currentV1County);
+    else v1TownBar.classList.add('hidden');
+    d1TownSelRow.style.display='none';
   }
   document.getElementById('btn-d1').classList.toggle('active',isD1);
   document.getElementById('btn-v1').classList.toggle('active',!isD1);
