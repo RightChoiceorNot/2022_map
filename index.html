@@ -458,6 +458,7 @@ function initD1(data){
   window._d1CountyStats=data.d1CountyStats;
   window._d1TownData   =data.d1TownData;
   window._d1TownList   =data.d1TownList;
+  window._d1TownBounds =data.d1TownBounds;  // ← 新增
 
   d1Layer=L.geoJSON(data.geojsonD1,{
     style: d1StyleFn,
@@ -588,7 +589,6 @@ function selectD1Town(town){
   document.querySelectorAll('#town-bar-d1 .town-btn').forEach(b=>b.classList.toggle('active',b.textContent===town));
   const townSel=document.getElementById('town-select-d1');
   if(townSel)townSel.value=town;
-
   if(town==='全部鄉鎮'){
     const stats=window._d1CountyStats||{};
     const data=stats[currentD1County]||{counts:{},total:0,uncontested:0};
@@ -629,11 +629,16 @@ function selectD1Town(town){
         document.getElementById('toggle-d1').textContent='▲ 收合';
       }
     }
-    const tk=currentD1County+'__'+town;
-    if(d1TownLayerBounds[tk]?.length){
-      let m=d1TownLayerBounds[tk][0];d1TownLayerBounds[tk].forEach(b=>{m=m.extend(b);});
-      mapD1.fitBounds(m,{padding:[40,40]});
+    // 飛到該鄉鎮
+    const tb=(window._d1TownBounds||{})[currentD1County]||{};
+    const townB=tb[town];
+    if(townB){
+      mapD1.fitBounds([townB.sw,townB.ne],{padding:[40,40]});
+    } else if(d1Bounds[currentD1County]?.length){
+      let m=d1Bounds[currentD1County][0];d1Bounds[currentD1County].forEach(b=>{m=m.extend(b);});
+      mapD1.fitBounds(m,{padding:[30,30]});
     }
+    // 暗化其他鄉鎮
     if(d1Layer){
       d1Layer.eachLayer(layer=>{
         const fc=layer.feature.properties.COUNTYNAME;
@@ -651,6 +656,7 @@ function initV1(data){
   window._v1CountyStats=data.v1CountyStats;
   window._v1TownStats  =data.v1TownStats;
   window._v1TownList   =data.v1TownList;
+  window._v1TownBounds =data.v1TownBounds;  // ← 新增
 
   v1Layer=L.geoJSON(data.geojsonV1,{
     style: v1StyleFn,
@@ -752,7 +758,8 @@ function selectV1County(county){
   renderStats('stats-v1-body',data.counts,data.total,'里',data.uncontested);
   if(county==='全台'){mapV1.setView([23.6,120.9],8);}
   else if(v1Bounds[county]?.length){
-    let m=v1Bounds[county][0];v1Bounds[county].forEach(b=>{m=m.extend(b);});mapV1.fitBounds(m,{padding:[30,30]});
+    let m=v1Bounds[county][0];v1Bounds[county].forEach(b=>{m=m.extend(b);});
+    mapV1.fitBounds(m,{padding:[30,30]});
   }
   if(v1Layer){
     v1Layer.eachLayer(layer=>{
@@ -782,36 +789,16 @@ function selectV1Town(town){
     document.getElementById('stats-v1-title').textContent=`📊 ${currentV1County} ${town} 村里長（共 ${data.total} 里）`;
   }
   renderStats('stats-v1-body',data.counts,data.total,'里',data.uncontested);
-  
-  const tk=currentV1County+'__'+town;
-if(town!=='全部鄉鎮'&&v1TownBounds[tk]?.length){
-  let m=v1TownBounds[tk][0];v1TownBounds[tk].forEach(b=>{m=m.extend(b);});
-  mapV1.fitBounds(m,{padding:[20,20]});
-} else if(town!=='全部鄉鎮'){
-  // fallback：從圖層直接掃描 bounds
-  if(v1Layer){
-    let found=false;
-    v1Layer.eachLayer(l=>{
-      if(found)return;
-      if(l.feature.properties.COUNTYNAME===currentV1County&&
-         l.feature.properties.TOWNNAME===town){
-        try{
-          const b=l.getBounds();
-          if(b.isValid()){mapV1.fitBounds(b,{padding:[20,20]});found=true;}
-        }catch(e){}
-      }
-    });
-  }
-  // 若仍找不到，飛到縣市範圍
-  if(v1Bounds[currentV1County]?.length){
+  // 飛到鄉鎮
+  const tb=(window._v1TownBounds||{})[currentV1County]||{};
+  const townB=tb[town];
+  if(town!=='全部鄉鎮'&&townB){
+    mapV1.fitBounds([townB.sw,townB.ne],{padding:[20,20]});
+  } else if(v1Bounds[currentV1County]?.length){
     let m=v1Bounds[currentV1County][0];v1Bounds[currentV1County].forEach(b=>{m=m.extend(b);});
     mapV1.fitBounds(m,{padding:[30,30]});
   }
-} else if(v1Bounds[currentV1County]?.length){
-  let m=v1Bounds[currentV1County][0];v1Bounds[currentV1County].forEach(b=>{m=m.extend(b);});
-  mapV1.fitBounds(m,{padding:[30,30]});
-}
-  
+  // 圖層顏色
   if(v1Layer){
     v1Layer.eachLayer(layer=>{
       const fc=layer.feature.properties.COUNTYNAME,ft=layer.feature.properties.TOWNNAME;
