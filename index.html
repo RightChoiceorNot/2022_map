@@ -469,10 +469,13 @@ function initD1(data){
         try{d1Bounds[county].push(layer.getBounds());}catch(e){}
       }
       if(county&&town){
-        const tk=county+'__'+town;
-        if(!d1TownLayerBounds[tk])d1TownLayerBounds[tk]=[];
-        try{d1TownLayerBounds[tk].push(layer.getBounds());}catch(e){}
-      }
+  const tk=county+'__'+town;
+  if(!v1TownBounds[tk])v1TownBounds[tk]=[];
+  try{
+    const b=layer.getBounds();
+    if(b.isValid())v1TownBounds[tk].push(b);
+  }catch(e){}
+}
       if(!isMobile){
         layer.on('mouseover',e=>{
           layer.setStyle({color:'#333',weight:2,fillOpacity:0.95,dashArray:null});
@@ -779,12 +782,36 @@ function selectV1Town(town){
     document.getElementById('stats-v1-title').textContent=`📊 ${currentV1County} ${town} 村里長（共 ${data.total} 里）`;
   }
   renderStats('stats-v1-body',data.counts,data.total,'里',data.uncontested);
+  
   const tk=currentV1County+'__'+town;
-  if(town!=='全部鄉鎮'&&v1TownBounds[tk]?.length){
-    let m=v1TownBounds[tk][0];v1TownBounds[tk].forEach(b=>{m=m.extend(b);});mapV1.fitBounds(m,{padding:[20,20]});
-  } else if(v1Bounds[currentV1County]?.length){
-    let m=v1Bounds[currentV1County][0];v1Bounds[currentV1County].forEach(b=>{m=m.extend(b);});mapV1.fitBounds(m,{padding:[30,30]});
+if(town!=='全部鄉鎮'&&v1TownBounds[tk]?.length){
+  let m=v1TownBounds[tk][0];v1TownBounds[tk].forEach(b=>{m=m.extend(b);});
+  mapV1.fitBounds(m,{padding:[20,20]});
+} else if(town!=='全部鄉鎮'){
+  // fallback：從圖層直接掃描 bounds
+  if(v1Layer){
+    let found=false;
+    v1Layer.eachLayer(l=>{
+      if(found)return;
+      if(l.feature.properties.COUNTYNAME===currentV1County&&
+         l.feature.properties.TOWNNAME===town){
+        try{
+          const b=l.getBounds();
+          if(b.isValid()){mapV1.fitBounds(b,{padding:[20,20]});found=true;}
+        }catch(e){}
+      }
+    });
   }
+  // 若仍找不到，飛到縣市範圍
+  if(v1Bounds[currentV1County]?.length){
+    let m=v1Bounds[currentV1County][0];v1Bounds[currentV1County].forEach(b=>{m=m.extend(b);});
+    mapV1.fitBounds(m,{padding:[30,30]});
+  }
+} else if(v1Bounds[currentV1County]?.length){
+  let m=v1Bounds[currentV1County][0];v1Bounds[currentV1County].forEach(b=>{m=m.extend(b);});
+  mapV1.fitBounds(m,{padding:[30,30]});
+}
+  
   if(v1Layer){
     v1Layer.eachLayer(layer=>{
       const fc=layer.feature.properties.COUNTYNAME,ft=layer.feature.properties.TOWNNAME;
