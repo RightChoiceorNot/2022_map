@@ -291,14 +291,7 @@ body{font-family:'Microsoft JhengHei','微軟正黑體',sans-serif;
     </div>
     <div class="stats-body" id="stats-v1-body"></div>
   </div>
-  <div id="note-v1" class="note-box hidden" style="position:absolute;bottom:12px;right:12px;
-    z-index:900;background:rgba(255,255,255,0.90);border-radius:7px;
-    padding:7px 11px;font-size:11px;color:#666;
-    box-shadow:0 2px 8px rgba(0,0,0,0.12);border:1px solid #ddd;
-    max-width:265px;line-height:1.65;">
-    游標滑過各里查看當選人與黨籍<br>
-    灰色里（共 21 里）：2022 年選舉後新設或 Shapefile 缺漏
-  </div>
+
 </div>
 
 <script>
@@ -476,15 +469,10 @@ function initD1(data){
         try{d1Bounds[county].push(layer.getBounds());}catch(e){}
       }
       if(county&&town){
-  const tk=county+'__'+town;
-  if(!d1TownLayerBounds[tk])d1TownLayerBounds[tk]=[];
-  try{
-    const b=layer.getBounds();
-    if(b.isValid()) d1TownLayerBounds[tk].push(b);
-  }catch(e){
-    console.warn('getBounds failed:', county, town, e);
-  }
-}
+        const tk=county+'__'+town;
+        if(!d1TownLayerBounds[tk])d1TownLayerBounds[tk]=[];
+        try{d1TownLayerBounds[tk].push(layer.getBounds());}catch(e){}
+      }
       if(!isMobile){
         layer.on('mouseover',e=>{
           layer.setStyle({color:'#333',weight:2,fillOpacity:0.95,dashArray:null});
@@ -597,6 +585,7 @@ function selectD1Town(town){
   document.querySelectorAll('#town-bar-d1 .town-btn').forEach(b=>b.classList.toggle('active',b.textContent===town));
   const townSel=document.getElementById('town-select-d1');
   if(townSel)townSel.value=town;
+
   if(town==='全部鄉鎮'){
     const stats=window._d1CountyStats||{};
     const data=stats[currentD1County]||{counts:{},total:0,uncontested:0};
@@ -637,27 +626,11 @@ function selectD1Town(town){
         document.getElementById('toggle-d1').textContent='▲ 收合';
       }
     }
-    // 飛到該鄉鎮
     const tk=currentD1County+'__'+town;
     if(d1TownLayerBounds[tk]?.length){
       let m=d1TownLayerBounds[tk][0];d1TownLayerBounds[tk].forEach(b=>{m=m.extend(b);});
       mapD1.fitBounds(m,{padding:[40,40]});
-    } else {
-      if(d1Layer){
-        let found=false;
-        d1Layer.eachLayer(l=>{
-          if(found)return;
-          if(l.feature.properties.COUNTYNAME===currentD1County&&
-             l.feature.properties.TOWNNAME===town){
-            try{
-              const b=l.getBounds();
-              if(b.isValid()){mapD1.fitBounds(b,{padding:[40,40]});found=true;}
-            }catch(e){}
-          }
-        });
-      }
     }
-    // 暗化其他鄉鎮
     if(d1Layer){
       d1Layer.eachLayer(layer=>{
         const fc=layer.feature.properties.COUNTYNAME;
@@ -684,8 +657,8 @@ function initV1(data){
       if(county){if(!v1Bounds[county])v1Bounds[county]=[];try{v1Bounds[county].push(layer.getBounds());}catch(e){}}
       if(county&&town){
         const tk=county+'__'+town;
-        if(!d1TownLayerBounds[tk])d1TownLayerBounds[tk]=[];
-        try{d1TownLayerBounds[tk].push(layer.getBounds());}catch(e){}
+        if(!v1TownBounds[tk])v1TownBounds[tk]=[];
+        try{v1TownBounds[tk].push(layer.getBounds());}catch(e){}
       }
       if(!isMobile){
         layer.on('mouseover',e=>{
